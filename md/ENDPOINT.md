@@ -20,7 +20,7 @@ supports it.
 | 3 | P0 primate-scale priors (mutation vs selection on CpGs) | done (P/D breaks the o/e ridge) | `md/PRIORS.md` |
 | 4 | E2 causal vs passenger, stabilising selection | done | `md/E2.md` |
 | 5 | **E2b: E2 at realistic θ** (4Nu = 0.001, CpG recurrence ≈ human) | done: passenger still neutral; causal P/D 2–11; CpG turnover with conserved R only at weak per-CpG 2Ns | `md/E2b.md` |
-| 6 | **E3: combined model**: TF and methylation both causal (g = O·exp(−R/R₀)), plus a methylation-sensitive TF variant (m lowers O, cf. NRF1) | next | `md/E3.md` |
+| 6 | **E3: combined model**: TF and methylation both causal (g = O·exp(−R/R₀)), plus a methylation-sensitive TF variant (m lowers O, CRE motif) | done: CP shows both signatures, lineages commit to alternative TF/methylation optima; methylation-sensitivity invisible (self-protection) | `md/E3.md` |
 | 7 | **E4: meQTL detection layer**: analytic power applied to simulated variants (detected if n·2p(1−p)β²/σ² passes the threshold; n = 500, 5,000, 30,000). Does the CpG-SNP vs motif-SNP difference in effect–frequency survive detection bias under M0, P and C? | | `md/E4.md` |
 | 8 | One real-N check (N = 10⁴, no rescaling) for the headline condition: overnight on the laptop, or the first cluster job | | in `md/E2b.md` or `md/E4.md` |
 | 9 | **Consolidated summary**: `md/SUMMARY.md` (numbered predictions → supporting experiment → real-data analysis A–D in `md/REAL_DATA.md`) plus a figure-led PDF | | `md/SUMMARY.md` |

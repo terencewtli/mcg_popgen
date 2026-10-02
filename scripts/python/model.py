@@ -104,3 +104,41 @@ def readout(nuc, P, gmode, R0=3.0):
     if gmode == 1:
         return float(occ(nuc, P))
     return float(np.exp(-meth_load(nuc, P) / R0))
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# E3 (scripts/slim/e3_combined.slim): motif choice and combined readouts.
+MOTIFS = {0: MOTIF, 1: np.array([3, 2, 0, 1, 2, 3, 1, 0])}     # 0 TGACTCAT; 1 TGACGTCA (CRE, CpG at motif pos 3-4)
+
+
+def occ_m(nuc, P, motif):
+    """CRE: the motif CpG (MSTART+3, +4) is required for binding; O = 0 without it (mirrors e3_combined.slim)."""
+    if motif is MOTIFS[1] and not (nuc[P.mstart + 3] == 1 and nuc[P.mstart + 4] == 2):
+        return 0.0
+    return float(occ_from_matches(np.sum(nuc[P.mstart:P.mstart + 8] == motif), P))
+
+
+def meth_at_m(nuc, p, P, motif):
+    if len(p) == 0:
+        return np.zeros(0)
+    o = occ_m(nuc, P, motif)
+    rho = np.zeros(len(p))
+    if P.A1 != 0:
+        allp = cpg_pos(nuc)
+        rho = (np.abs(allp[None, :] - p[:, None]) <= P.W).sum(1) - 1.0
+    d = dist_to_motif(p, P)
+    return 1.0 / (1.0 + np.exp(-(P.A0 - P.A1 * rho - P.A2 * o * np.exp(-d / P.LAMBDA))))
+
+
+def readout_e3(nuc, P, gmode, motif_id, R0=3.0):
+    """GMODE 1: O; 2: exp(-R/R0); 3: O exp(-R/R0); 4: O (1 - m_c), m_c = methylation of the CpG at MSTART+3."""
+    motif = MOTIFS[motif_id]
+    o = occ_m(nuc, P, motif)
+    if gmode == 1:
+        return o
+    if gmode == 4:
+        c = P.mstart + 3
+        mc = float(meth_at_m(nuc, np.array([c]), P, motif)[0]) if (nuc[c] == 1 and nuc[c + 1] == 2) else 0.0
+        return o * (1.0 - mc)
+    R = float(np.sum(meth_at_m(nuc, cpg_pos(nuc), P, motif)))
+    return o * np.exp(-R / R0) if gmode == 3 else float(np.exp(-R / R0))
