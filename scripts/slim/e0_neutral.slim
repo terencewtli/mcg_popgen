@@ -1,0 +1,65 @@
+// E0 neutral nucleotide model: Jukes-Cantor background + CpG transition hypermutation (+ optional constant gate).
+// No selection. Used for (i) pi / folded SFS vs coalescent expectations, (ii) CpG-count trajectory vs the
+// single-lineage Python oracle (scripts/python/oracle.py), (iii) rescaling invariance.
+//
+// Rates (per site per generation, per haplosome):
+//   every non-CpG-transition change      ALPHA            (JC: total 3*ALPHA per site)
+//   C->T at CpG C, G->A at CpG G         RCPG*ALPHA       (trinucleotide matrix)
+//   GATE < 1: each proposed CpG transition is accepted with prob GATE in a mutation() callback, so the
+//   effective CpG transition rate is GATE*RCPG*ALPHA. This is the same rejection mechanism the methylation-gated
+//   model uses (with GATE replaced by a per-haplotype methylation-dependent probability).
+// SLiM conventions that matter: bases off either chromosome end are treated as "A" for context; the mutation()
+// callback's `haplosome` is the PARENTAL haplosome being copied (exact only without recombination at that site).
+//
+// Required -d: N L ALPHA RCPG GATE RREC GENS NCHK NSAMP OUT
+initialize() {
+    initializeSLiMOptions(nucleotideBased=T);
+    initializeAncestralNucleotides(randomNucleotides(L));
+    initializeMutationTypeNuc("m1", 0.5, "f", 0.0);
+    m1.convertToSubstitution = T;
+    mm = matrix(rep(ALPHA, 64 * 4), ncol=4);
+    for (i in 0:63) mm[i, integerMod(integerDiv(i, 4), 4)] = 0.0;      // no self-mutation of the central base
+    for (a in 0:3) {
+        mm[a * 16 + 1 * 4 + 2, 3] = RCPG * ALPHA;                       // aCG: central C -> T
+        mm[1 * 16 + 2 * 4 + a, 0] = RCPG * ALPHA;                       // CGa: central G -> A
+    }
+    initializeGenomicElementType("g1", m1, 1.0, mm);
+    initializeGenomicElement(g1, 0, L - 1);
+    initializeRecombinationRate(RREC);
+}
+
+function (integer)cpgCount(object<Haplosome> h) {
+    // CpG count per haplosome
+    return sapply(h, "n = applyValue.nucleotides(format='integer'); sum((n[0:(L-2)] == 1) & (n[1:(L-1)] == 2));");
+}
+
+mutation(m1) {
+    if (GATE >= 1.0) return T;
+    nv = mut.nucleotideValue;
+    pos = mut.position;
+    if ((originalNuc == 1) & (nv == 3) & (pos < L - 1)) {
+        if (haplosome.nucleotides(pos + 1, pos + 1, format="integer") == 2) return (runif(1) < GATE);
+    } else if ((originalNuc == 2) & (nv == 0) & (pos > 0)) {
+        if (haplosome.nucleotides(pos - 1, pos - 1, format="integer") == 1) return (runif(1) < GATE);
+    }
+    return T;
+}
+
+1 early() {
+    sim.addSubpop("p1", N);
+    writeFile(OUT + ".anc.txt", sim.chromosomes.ancestralNucleotides());
+    writeFile(OUT + ".traj.tsv", "gen\tmean_cpg\tsd_cpg");
+    defineConstant("CHK", asInteger(round(seq(0.0, asFloat(GENS), length=NCHK + 1))));
+}
+1:1000000000 late() {
+    g = community.tick;
+    if (any(CHK == g) | g == 1) {
+        c = cpgCount(p1.haplosomes);
+        writeFile(OUT + ".traj.tsv", paste(g, mean(c), sd(c), sep="\t"), append=T);
+    }
+    if (g == GENS) {
+        h = sample(p1.haplosomes, NSAMP);
+        writeFile(OUT + ".sample.txt", sapply(h, "applyValue.nucleotides();"));
+        sim.simulationFinished();
+    }
+}

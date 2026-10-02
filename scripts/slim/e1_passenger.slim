@@ -1,0 +1,124 @@
+// E1: passenger methylation. One TF motif in a neutral locus; methylation is computed from the haplotype's own sequence
+// and (in MODE=1) gates CpG hypermutation. Fitness reads TF occupancy only (or nothing when SEL = 0); methylation never
+// enters fitness. Python mirror of every map: scripts/python/model.py (parity is checked by e1.py).
+//
+// Maps (per haplosome x):
+//   O(x)   = 1 / (1 + exp(-BETA * (S(x) - S0))),  S = # positions matching MOTIF at MSTART..MSTART+7
+//   m_i(x) = 1 / (1 + exp(-(A0 - A1 * rho_i - A2 * O(x) * exp(-d_i / LAMBDA))))   for each CpG starting at i
+//            rho_i = # other CpGs starting within +-W of i;  d_i = max(0, |i - MCENTER| - 4) (bp outside the motif)
+//   E      = (O(h1) + O(h2)) / 2;   w = exp(-SEL * (1 - E)^2)
+// Mutation: JC background ALPHA per target; CpG transitions RCPG*ALPHA in the matrix. MODE=1 accepts each proposed
+//   CpG transition with prob (1 + (RCPG-1) m_i) / RCPG, i.e. rate ALPHA*(1 + (RCPG-1) m_i): unmethylated CpG = ordinary
+//   transition rate, fully methylated = RCPG-fold. MODE=0 (context-only) accepts all (m treated as 1).
+// No recombination, so the parental haplosome passed to mutation() is exactly the sequence being mutated.
+//
+// Required -d: N L ALPHA RCPG MODE SEL A0 A1 A2 W LAMBDA BETA S0 BURN MEAS EVERY NSAMP OUT
+initialize() {
+    initializeSLiMOptions(nucleotideBased=T);
+    defineConstant("MOTIF", c(3, 2, 0, 1, 3, 1, 0, 3));          // TGACTCAT (no CpG)
+    defineConstant("MSTART", asInteger(L / 2) - 4);
+    defineConstant("MCENTER", MSTART + 3.5);
+    anc = randomNucleotides(L, format="integer");
+    anc[MSTART:(MSTART + 7)] = MOTIF;
+    initializeAncestralNucleotides(anc);
+    initializeMutationTypeNuc("m1", 0.5, "f", 0.0);
+    m1.convertToSubstitution = T;
+    mm = matrix(rep(ALPHA, 64 * 4), ncol=4);
+    for (i in 0:63) mm[i, integerMod(integerDiv(i, 4), 4)] = 0.0;
+    for (a in 0:3) {
+        mm[a * 16 + 1 * 4 + 2, 3] = RCPG * ALPHA;
+        mm[1 * 16 + 2 * 4 + a, 0] = RCPG * ALPHA;
+    }
+    initializeGenomicElementType("g1", m1, 1.0, mm);
+    initializeGenomicElement(g1, 0, L - 1);
+    initializeRecombinationRate(0.0);
+}
+
+function (float$)occNuc(integer nuc) {
+    s = sum(nuc[MSTART:(MSTART + 7)] == MOTIF);
+    return 1.0 / (1.0 + exp(-BETA * (s - S0)));
+}
+function (float$)occMotif(integer motifNuc) {
+    // occupancy from the 8 motif bases only (fast path for fitnessEffect)
+    return 1.0 / (1.0 + exp(-BETA * (sum(motifNuc == MOTIF) - S0)));
+}
+function (integer)cpgPos(integer nuc) {
+    return which((nuc[0:(L - 2)] == 1) & (nuc[1:(L - 1)] == 2));
+}
+function (float)methAt(integer nuc, integer p) {
+    // methylation of the CpGs starting at positions p, on the haplotype with sequence nuc
+    if (size(p) == 0) return float(0);
+    o = occNuc(nuc);
+    d = pmax(0.0, abs(p - MCENTER) - 4.0);
+    rho = rep(0.0, size(p));
+    if (A1 != 0) {
+        allp = cpgPos(nuc);
+        rho = sapply(p, "asFloat(sum(abs(allp - applyValue) <= W) - 1);");
+    }
+    return 1.0 / (1.0 + exp(-(A0 - A1 * rho - A2 * o * exp(-d / LAMBDA))));
+}
+
+mutation(m1) {
+    if (MODE == 0) return T;
+    nv = mut.nucleotideValue;
+    pos = mut.position;
+    p = -1;
+    if ((originalNuc == 1) & (nv == 3) & (pos < L - 1)) {
+        if (haplosome.nucleotides(pos + 1, pos + 1, format="integer") == 2) p = pos;
+    } else if ((originalNuc == 2) & (nv == 0) & (pos > 0)) {
+        if (haplosome.nucleotides(pos - 1, pos - 1, format="integer") == 1) p = pos - 1;
+    }
+    if (p < 0) return T;
+    m = methAt(haplosome.nucleotides(format="integer"), p);
+    return (runif(1) < (1.0 + (RCPG - 1.0) * m) / RCPG);
+}
+
+fitnessEffect() {
+    if (SEL == 0) return 1.0;
+    h = individual.haplosomes;
+    e = 0.5 * (occMotif(h[0].nucleotides(MSTART, MSTART + 7, format="integer")) +
+               occMotif(h[1].nucleotides(MSTART, MSTART + 7, format="integer")));
+    return exp(-SEL * (1.0 - e)^2);
+}
+
+1 early() {
+    sim.addSubpop("p1", N);
+    defineGlobal("CPG", rep(0, L));     // # sampled haplosomes with a CpG starting at each position
+    defineGlobal("CC", rep(0, L));      // # with C at position
+    defineGlobal("GG", rep(0, L));      // # with G at position
+    defineGlobal("MSUM", rep(0.0, L));  // sum of m over sampled CpGs starting at position
+    defineGlobal("OSUM", 0.0);
+    defineGlobal("SMATCH", rep(0, 9));  // distribution of motif match counts
+    defineGlobal("NS", 0);
+}
+1:1000000000 late() {
+    g = community.tick;
+    if ((g > BURN) & (integerMod(g - BURN, EVERY) == 0)) {
+        ns = 0; os = 0.0;   // plain assignment to a global inside a callback would make a local copy
+        for (h in sample(p1.haplosomes, NSAMP)) {
+            nuc = h.nucleotides(format="integer");
+            p = cpgPos(nuc);
+            CPG[p] = CPG[p] + 1;
+            CC[nuc == 1] = CC[nuc == 1] + 1;
+            GG[nuc == 2] = GG[nuc == 2] + 1;
+            if (size(p)) MSUM[p] = MSUM[p] + methAt(nuc, p);
+            os = os + occNuc(nuc);
+            s = sum(nuc[MSTART:(MSTART + 7)] == MOTIF);
+            SMATCH[s] = SMATCH[s] + 1;
+            ns = ns + 1;
+        }
+        defineGlobal("NS", NS + ns);
+        defineGlobal("OSUM", OSUM + os);
+    }
+    if (g == BURN + MEAS) {
+        writeFile(OUT + ".prof.tsv", c("pos\tn\tcpg\tc\tg\tmsum",
+            asString(0:(L - 1)) + "\t" + NS + "\t" + CPG + "\t" + CC + "\t" + GG + "\t" + MSUM));
+        writeFile(OUT + ".scal.tsv", c("n\tosum\t" + paste("s" + (0:8), sep="\t"),
+            NS + "\t" + OSUM + "\t" + paste(SMATCH, sep="\t")));
+        // last generation's sampled haplosomes, with SLiM-computed m, for the Python parity check
+        h = sample(p1.haplosomes, NSAMP);
+        writeFile(OUT + ".seqs.txt", sapply(h, "applyValue.nucleotides();"));
+        writeFile(OUT + ".parity.tsv", c("hap\tpos\tm\tocc", sapply(seqAlong(h), "nuc = h[applyValue].nucleotides(format='integer'); p = cpgPos(nuc); size(p) ? (applyValue + '\t' + p + '\t' + methAt(nuc, p) + '\t' + occNuc(nuc)) else string(0);")));
+        sim.simulationFinished();
+    }
+}

@@ -1,0 +1,289 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\setlist{itemsep=2pt,topsep=4pt}
+\newtheorem{lemma}{Lemma}
+\newtheorem{claim}{Claim}
+\theoremstyle{definition}
+\newtheorem{remark}{Remark}
+\newcommand{\sig}{\sigma}
+\newcommand{\E}{\mathbb{E}}
+\renewcommand{\Pr}{\mathbb{P}}
+
+\title{Generative model and core theory for \texttt{mcg\_popgen}\\[2pt]
+\large Sequence $\to$ TF occupancy $\to$ methylation $\to$ (mutation, fitness) in a Wright--Fisher population}
+\author{working notes}
+\date{2026-10-01}
+
+\begin{document}
+\maketitle
+
+\noindent This document states exactly what the simulations compute. Every quantity here has a counterpart in
+\texttt{scripts/slim/*.slim} (SLiM~5.2) and \texttt{scripts/python/model.py}. Section~\ref{sec:cycle} gives the
+per-generation algorithm, Sections~\ref{sec:mut}--\ref{sec:fit} the maps, Section~\ref{sec:models} the model set,
+Section~\ref{sec:theory} the results used to validate the simulator (experiment E0), and Section~\ref{sec:e1} the
+predictions for experiment E1.
+
+\section{What the experiments are}
+\begin{description}
+\item[E0 (calibration).] No methylation or TF. It checks that the SLiM machinery (mutation matrix, rejection gating,
+  selection, rescaling) reproduces quantities that can be derived exactly: neutral diversity, the site-frequency
+  spectrum, Kimura fixation probabilities, and CpG decay. It says nothing biological. It certifies the simulator.
+\item[E1 (passenger footprint).] Methylation is computed from sequence and can gate CpG mutation, but it
+  \emph{never} enters fitness. Question: how much CpG enrichment near a selected TF motif arises with zero selection
+  on any CpG?
+\item[E2 (causal vs passenger; next).] Same maps; fitness reads methylation (model C) or occupancy (model P).
+  Question: which observable statistics separate them once mean methylation is matched?
+\end{description}
+
+\section{State space and notation}
+\begin{itemize}
+\item A locus of $L$ bases (E1: $L=300$). A haplotype is $x=(x_0,\dots,x_{L-1})\in\{A,C,G,T\}^L$, coded $0,1,2,3$.
+\item The population has $N$ diploid hermaphrodites, i.e.\ $2N$ haplotypes. Individual $j$ is a pair
+  $(x^{(j,1)},x^{(j,2)})$. There is no recombination within the locus.
+\item CpG set: $\mathcal{C}(x)=\{i: x_i=C,\ x_{i+1}=G\}$, indexed by the position $i$ of the C.
+\item TF motif: a fixed 8-mer $\mu=\texttt{TGACTCAT}$ (it contains no CpG), at positions $M=\{s,\dots,s+7\}$, with
+  $s=L/2-4$ and centre $c=s+3.5$.
+\item Distance of position $i$ from the motif edge: $d_i=\max(0,\ |i-c|-4)$.
+\item $\sig(z)=1/(1+e^{-z})$.
+\end{itemize}
+Methylation is \textbf{not} a state variable. It is recomputed from each haplotype's sequence whenever it is needed.
+This encodes germline reprogramming: there is no transgenerational epigenetic inheritance, so methylation is a
+deterministic molecular phenotype of the haplotype (in cis), averaged over cells.
+
+\section{One generation (SLiM's Wright--Fisher cycle)}\label{sec:cycle}
+Let generation $t$ consist of $N$ individuals with fitnesses $w_1,\dots,w_N$ (computed at the end of generation $t-1$).
+\begin{enumerate}
+\item \textbf{Parent choice.} Each of the $N$ offspring draws two parents independently, each with probability
+  $w_j/\sum_k w_k$. Incidental selfing (the same parent drawn twice, probability $\approx 1/N$) is allowed, as in the
+  standard WF model.
+\item \textbf{Gamete formation.} Each parent transmits one of its two haplotypes, chosen with probability $1/2$.
+  There is no recombination.
+\item \textbf{Mutation.} The transmitted haplotype $x$ receives new mutations by the context-dependent process of
+  Section~\ref{sec:mut}, including the methylation gate (evaluated on $x$, the parental sequence).
+\item \textbf{Bookkeeping and sampling.} \texttt{late()} events record statistics. Fitness $w$ of each new individual
+  is then computed from its two haplotypes (Section~\ref{sec:fit}) and used in step 1 of the next generation.
+\end{enumerate}
+Selection is therefore fecundity/viability selection applied once per generation, and drift is multinomial sampling of
+$2N$ haplotypes. The effective size is $N_e=N$ (diploid WF), which is the convention for every $2N s$ and $4N u$ below.
+
+\section{Mutation process}\label{sec:mut}
+\subsection{Context-only (``ctx'') process}
+Each haplotype base $i$ mutates to base $b\neq x_i$ at rate (per generation)
+\begin{equation}
+q_i(b\mid x)=\begin{cases} r\alpha & \text{if } (x_i,x_{i+1},b)=(C,G,T) \text{ or } (x_{i-1},x_i,b)=(C,G,A)\\
+\alpha & \text{otherwise.}\end{cases}
+\label{eq:q}
+\end{equation}
+This is Jukes--Cantor (total $u=3\alpha$ per site) plus CpG transition hypermutability $r$. In SLiM it is a $64\times4$
+trinucleotide matrix (rows are $(x_{i-1},x_i,x_{i+1})$, columns are $b$). Bases off either end count as $A$ (SLiM's
+convention), so position $0$ is never the G of a CpG.
+
+\subsection{Methylation-gated (``meth'') process}
+Deamination of 5mC is what makes CpGs hypermutable, so only the \emph{methylated} fraction carries the excess rate:
+\begin{equation}
+q_i^{\text{meth}}(T\mid x)=\alpha\,[1+(r-1)\,m_i(x)] \quad\text{for } i\in\mathcal{C}(x),
+\label{eq:qmeth}
+\end{equation}
+and likewise for the G (G$\to$A) of the same CpG, using the same $m_i$. All other rates are as in~\eqref{eq:q}. An
+unmethylated CpG ($m=0$) has the ordinary transition rate $\alpha$, and a fully methylated one has $r\alpha$.
+
+\textbf{Implementation by thinning.} SLiM proposes CpG transitions at the maximal rate $r\alpha$ (from the matrix). A
+\texttt{mutation()} callback then accepts each proposal with probability
+\begin{equation}
+g(m)=\frac{1+(r-1)m}{r}\in[1/r,\,1].
+\end{equation}
+\begin{lemma}[thinning]
+If events occur as a Poisson process of rate $\lambda$ and each is kept independently with probability $g$, the kept
+events form a Poisson process of rate $g\lambda$. Hence accepted CpG transitions occur at exactly
+rate~\eqref{eq:qmeth}.
+\end{lemma}
+SLiM already uses thinning internally: it proposes at the matrix's maximal row rate and rejects according to the actual
+context. The gate is a second, state-dependent thinning. One caveat matters. SLiM passes the \emph{parental}
+haplotype to the callback, so $m_i$ is evaluated on the sequence being copied. That is exact only without
+recombination, which is why the methylation models have none. E0 verified that a constant gate $g=0.5$ at $r=20$ is
+indistinguishable from ctx at $r=10$.
+
+\section{Maps: sequence $\to$ occupancy $\to$ methylation}\label{sec:maps}
+\textbf{TF occupancy} (per haplotype). With $S(x)=\sum_{k=0}^{7}\mathbf{1}[x_{s+k}=\mu_k]$ the number of matches,
+\begin{equation}
+O(x)=\sig\!\big(\beta\,(S(x)-S_0)\big),\qquad \beta=2,\ S_0=6.
+\end{equation}
+This gives $O=0.982,\,0.881,\,0.5,\,0.119$ for $S=8,7,6,5$. It is the simplest stand-in for a PWM/binding-energy
+model: occupancy saturates for good sites and collapses after two mismatches.
+
+\textbf{Methylation} of the CpG at $i\in\mathcal{C}(x)$:
+\begin{equation}
+m_i(x)=\sig\!\Big(a_0-a_1\,\rho_i(x)-a_2\,O(x)\,e^{-d_i/\lambda}\Big),\qquad
+\rho_i(x)=\#\{j\in\mathcal{C}(x)\setminus\{i\}: |j-i|\le W\}.
+\label{eq:meth}
+\end{equation}
+\begin{itemize}
+\item $a_0=3$ is the default state: $m=\sig(3)=0.953$ (bulk mammalian CpGs are mostly methylated).
+\item $a_2=6$ and $\lambda=25$ set TF protection, i.e.\ low-methylated regions around bound sites (Stadler et al.\ 2011).
+  A CpG next to a bound motif has $m=\sig(3-6\cdot0.982)=0.053$.
+\item $a_1$ and $W$ set CpG-density feedback: dense CpG clusters resist methylation (CGI-like). With $a_1=0$ the map is
+  local and per-CpG. With $a_1>0$ it is \emph{degenerate}: many sequences give the same $m$, and selection on $m$
+  spreads over many sites.
+\end{itemize}
+A Python mirror (\texttt{model.py}) recomputes $m_i$ from SLiM's output sequences. Agreement is $<10^{-6}$, the limit
+of printed precision.
+
+\section{Expression and fitness}\label{sec:fit}
+Diploid expression is additive (codominant) across the two haplotypes, and fitness is stabilising around the
+optimum $E^*=1$:
+\begin{equation}
+E_j=\tfrac12\big[g(x^{(j,1)})+g(x^{(j,2)})\big],\qquad w_j=\exp\!\big(-\kappa\,(1-E_j)^2\big).
+\end{equation}
+The haplotype readout $g(\cdot)$ is what distinguishes the models:
+\begin{equation}
+\text{P (passenger): } g(x)=O(x);\qquad \text{C (causal, E2): } g(x)=1-\bar m_{\text{prom}}(x);\qquad
+\text{M0 (neutral): } \kappa=0.
+\end{equation}
+\textbf{Reporting selection.} $\kappa$ by itself is not interpretable. For a genotype $G$ we report
+$2N s_G$, with $s_G=1-w_G/w_{8/8}$. $\kappa$ is set so that one heterozygous motif mismatch has $2Ns_{8/7}=10$. That gives
+$\kappa=11.7$ at $N=100$ and $2Ns=30,\ 108,\ 181$ for $7/7$, $8/6$, $8/5$. The motif is under strong selection and
+CpGs are under none.
+
+\section{The model set and the causal/passenger question}\label{sec:models}
+\begin{center}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+model & fitness reads & mutation & CpG feedback & role\\
+\midrule
+M0\_ctx & nothing & ctx & -- & neutral baseline (E0's process)\\
+M0\_meth & nothing & meth & $a_1=0$ & motif decays, so no protection\\
+M0\_meth\_fb & nothing & meth & $a_1=0.5$ & can CpG islands self-sustain?\\
+P\_ctx & $O$ & ctx & -- & selection on TF, no gating\\
+P\_meth & $O$ & meth & $a_1=0$ & \textbf{passenger footprint}\\
+P\_meth\_fb & $O$ & meth & $a_1=0.5$ & passenger + feedback\\
+C (E2) & $\bar m$ & meth & swept & methylation causal\\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{remark}[why P vs C is a statement about the genotype--fitness map]
+Because $m$ is a function of $x$, every model is ``selection on sequence''. P and C share both maps
+($x\mapsto O$, $x\mapsto m$) and differ only in which composition, $w\circ O$ or $w\circ m$, defines fitness. A
+mutation $x\to x'$ can discriminate them only if it changes one readout but not the other. Examples: a CpG gain or loss
+outside the motif changes $m$ but not $O$; a motif mismatch with buffered methylation changes $O$ but barely changes
+$m$. Such a mutation has a detectable fitness effect under C only if its selection is not swamped by drift, i.e.\
+$2N\,|s(x\to x')|\gtrsim 1$. For a per-CpG effect $\Delta m$, $s\approx 2\kappa(1-E)\,\Delta m/2$ (to first order),
+so identifiability requires
+\begin{equation}
+2N\kappa\,(1-E)\,|\Delta \bar m| \gtrsim 1 .
+\end{equation}
+Two consequences follow. Under a degenerate map ($a_1>0$, near saturation), single-CpG $|\Delta\bar m|$ is small,
+so individual sites look neutral even when $\bar m$ is strongly conserved. And methylation-gated mutation (E1) can
+create CpG patterns that look like constraint with no selection at all.
+\end{remark}
+
+\section{Theory used for validation (E0)}\label{sec:theory}
+\subsection{Fixation probability}
+With genotype fitnesses $1,1+s/2,1+s$, the diffusion has drift $M(p)=\tfrac{s}{2}p(1-p)$ and variance
+$V(p)=p(1-p)/2N$. The scale function gives $u(p)=\dfrac{1-e^{-2Nsp}}{1-e^{-2Ns}}$, so a single new copy
+($p=1/2N$) fixes with
+\begin{equation}
+u=\frac{1-e^{-s}}{1-e^{-2Ns}}\quad\xrightarrow{s\to0}\quad\frac{1}{2N}.
+\end{equation}
+E0: 20{,}000 trials at each of 8 settings, all within 1.3 SE.
+
+\subsection{Neutral diversity at finite sites}
+Two lineages coalesce after $T\sim\text{Exp}(1/2N)$ generations, so they are separated by total branch length $2T$.
+Under JC, the probability that a site is identical after branch length $\ell$ is $\tfrac14+\tfrac34e^{-4u\ell/3}$.
+Then
+\begin{equation}
+\pi=1-\E\!\left[\tfrac14+\tfrac34e^{-8uT/3}\right]=\frac{\theta}{1+4\theta/3},\qquad \theta=4Nu.
+\end{equation}
+With $\theta=0.01$, $\pi=0.009868$. E0 matched this at $N=500,250,100$.
+
+\subsection{Neutral SFS}
+In a sample of $n$, $\E[\xi_i]=\theta/i$. Folding gives the shape $\propto 1/i+1/(n-i)$. E0 obtained $\chi^2$ of 24--33
+on 24 degrees of freedom.
+
+\subsection{The single-lineage oracle}
+\begin{lemma}
+Assume no selection and a mutation process in which each haplotype's rates depend only on its own sequence (true for
+ctx and meth, since methylation is cis). Then, for any haplotype sampled at generation $t$,
+$\Pr(x(t)=y)=\big[e^{tQ}\big]_{x(0),y}$, where $Q$ is the generator of the per-sequence mutation chain on
+$\{A,C,G,T\}^L$.
+\end{lemma}
+\begin{proof}[Sketch]
+Trace the sampled haplotype's ancestry back to generation $0$. Under neutrality, the genealogy (which parent and which
+haplotype was copied) is independent of the sequences. Along the ancestral path, the sequence changes only by
+mutation, with rates that depend only on the current sequence on that path. So $x(t)$ is the chain run for $t$ steps
+from $x(0)$. Discrete versus continuous time differs at $O(\text{rate}^2)$.
+\end{proof}
+Hence $\E[\#\text{CpG}](t)$ in the population equals that of a Gillespie simulation of one sequence. This is the
+\texttt{oracle.py} check, and it needs no equilibrium. Under selection the lemma fails, because genealogy and
+sequence become coupled. For P models the oracle instead freezes the motif, and SLiM minus oracle then measures the
+effect of motif polymorphism.
+
+\subsection{Rescaling}
+The diffusion limit depends on parameters only through $Nu$, $Ns$, $Nr_{\text{rec}}$ and time in units of $N$. Running
+$(N/Q,\ uQ,\ sQ,\ t/Q)$ preserves these and costs $Q^2$ less. This is valid while per-generation rates stay small
+($r\alpha Q\ll1$, $sQ\ll1$). E0 checked neutral statistics at $Q=1,2,5$. E1 checks P\_meth at $Q=1,2,4$.
+
+\section{E1 prediction: a two-state approximation}\label{sec:e1}
+Treat one dinucleotide position as either CpG or not. A CpG with methylation $m$ is lost at rate
+\begin{equation}
+\ell(m)=\underbrace{2\alpha[1+(r-1)m]}_{\text{C}\to\text{T},\ \text{G}\to\text{A}}+\underbrace{4\alpha}_{\text{other changes of C or G}}.
+\end{equation}
+A non-CpG becomes a CpG at rate $\gamma\alpha$, where $\gamma\approx 6/15$: 6 of the 15 non-CpG dinucleotides are one
+step from CG (CA, CC, CT, AG, GG, TG), if dinucleotides were uniform. The equilibrium CpG frequency per position is then
+\begin{equation}
+f(m)\approx\frac{\gamma\alpha}{\gamma\alpha+\ell(m)}.
+\end{equation}
+Checks and predictions at $r=20$:
+\begin{itemize}
+\item $m=1$ (E0's ctx): $f\approx0.4/44.4=0.009$, i.e.\ 0.90 CpG per 100\,bp. E0 measured 0.94. The approximation is
+  good because the TG/CA decay products are themselves one step from CG.
+\item Far flank in P\_meth ($m=0.953$): $\ell=42.2\alpha$, giving 0.94 per 100\,bp.
+\item Next to the bound motif ($m=0.053$): $\ell=8.0\alpha$, giving 4.8 per 100\,bp, a \textbf{${\sim}5\times$ enrichment
+  with zero selection on CpGs}. It falls to ${\sim}1.3\times$ at $d=25$, where $m=0.70$.
+\end{itemize}
+This ignores dependence between neighbouring positions and the motif's own polymorphism. The oracle computes the exact
+neutral-flank expectation, and SLiM includes everything.
+
+\paragraph{The feedback case.} With $a_1>0$, retention lowers $m$ (through $\rho$), which raises retention further. The
+map $f\mapsto f(m(\rho(f)))$ can have two stable fixed points: a methylated, CpG-poor state and an unmethylated,
+CpG-rich island. Whether an island self-sustains after the TF is lost (M0\_meth\_fb) or needs the TF to seed it
+(P\_meth\_fb) is an empirical question for E1.
+
+\section{Assumptions made explicit}
+\begin{enumerate}
+\item Methylation is regenerated from sequence each generation. There are no epialleles.
+\item Methylation is a cell-averaged deterministic value. Stochastic cell-to-cell noise would matter only through
+  nonlinearity in fitness.
+\item Cis only. There are no trans factors, so the TF's concentration is constant.
+\item There is no methylation $\to$ TF arrow (methyl-sensitive TFs such as NRF1 are deferred). This is what makes P a
+  ``pure'' passenger.
+\item No recombination and no gBGC within the locus.
+\item Constant $N$, a single population, and no demography. Two-population splits come in E3.
+\item Codominant, additive expression. Fitness is Gaussian in $E$ with the optimum at the maximum.
+\end{enumerate}
+
+\section{Parameters (E1 baseline, $Q=2$)}
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+symbol & value & meaning\\
+\midrule
+$N$ & 100 & diploids ($Q=1$: 200)\\
+$L$ & 300 & bp\\
+$\alpha$ & $2\times10^{-5}$ & per target per generation; $u=3\alpha$, $\theta=4Nu=0.024$\\
+$r$ & 20 (5, 50) & CpG transition multiplier\\
+$\beta,S_0$ & 2, 6 & occupancy curve\\
+$a_0,a_1,a_2$ & 3, 0 or 0.5, 6 & methylation map\\
+$\lambda,W$ & 25 (10, 50), 25 & protection range, density window (bp)\\
+$\kappa$ & 11.7 & so that $2Ns_{8/7}=10$\\
+burn-in, measurement & $5/u$, $2/u$ generations & composition equilibrates on the $1/u$ timescale, not $N$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The burn-in is set by $1/u$ rather than by $N$. Base composition (CpG content) changes only by substitution, which
+takes $\sim1/u$ generations per site regardless of $N$. A $10N$ burn-in equilibrates diversity but not CpG content.
+
+\end{document}

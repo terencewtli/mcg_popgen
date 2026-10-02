@@ -1,0 +1,47 @@
+// E0 fixation probability: K independent Wright-Fisher subpopulations of N diploids (no migration), each seeded
+// with one copy of a new mutation (selection coefficient S, dominance H). SLiM fitness: 1, 1+H*S, 1+S.
+// A mutation is recorded as fixed when it reaches 2N copies (it lives in one subpop only) and is then removed;
+// lost mutations disappear on their own; subpops with a resolved mutation are then removed. Ends when nothing
+// segregates.
+// Kimura (H = 0.5, Ne = N, p0 = 1/2N): u = (1 - exp(-S)) / (1 - exp(-2 N S)); derivation in md/E0.md.
+//
+// Required -d: N K S H OUT
+initialize() {
+    initializeMutationType("m1", H, "f", S);
+    m1.convertToSubstitution = F;
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, 0);
+    initializeMutationRate(0.0);
+    initializeRecombinationRate(0.0);
+    defineGlobal("NFIX", 0);
+}
+1 early() {
+    for (i in 0:(K - 1)) sim.addSubpop(i, N);
+}
+1 late() {
+    // added in late() so fitness is recalculated with the mutation before the first offspring generation it affects
+    for (sp in sim.subpopulations) {
+        mut = sample(sp.haplosomes, 1).addNewMutation(m1, S, 0);
+        mut.tag = sp.id;
+    }
+}
+2:1000000000 late() {
+    muts = sim.mutations;
+    if (size(muts)) {
+        cnt = sim.mutationCounts(NULL, muts);
+        fixed = muts[cnt == 2 * N];
+        if (size(fixed)) {
+            defineGlobal("NFIX", NFIX + size(fixed));
+            sim.subpopulations.haplosomes.removeMutations(fixed);
+        }
+        // drop subpops whose mutation is resolved (lost or fixed) so they stop costing time
+        live = muts[cnt < 2 * N].tag;
+        dead = sim.subpopulations[match(sim.subpopulations.id, live) < 0];
+        for (d in dead) d.setSubpopulationSize(0);
+    }
+    if (size(sim.mutations) == 0) {
+        writeFile(OUT, paste("N", "K", "S", "H", "nfix", "gens", sep="\t"));
+        writeFile(OUT, paste(N, K, S, H, NFIX, community.tick, sep="\t"), append=T);
+        sim.simulationFinished();
+    }
+}

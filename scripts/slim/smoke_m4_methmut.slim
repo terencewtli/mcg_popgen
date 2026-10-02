@@ -1,0 +1,43 @@
+// Smoke test: 200 bp nucleotide locus, one 8-bp motif at 96..103, CpG hypermutation gated by
+// per-haplotype methylation (mutation() callback rejection), stabilizing selection on occupancy.
+initialize() {
+    initializeSLiMOptions(nucleotideBased=T);
+    defineConstant("L", 200); defineConstant("N", 1000);
+    defineConstant("MOTIF", c(0,1,2,3,3,2,1,0)); // ACGTTGCA (contains one CpG)
+    defineConstant("MSTART", 96);
+    initializeAncestralNucleotides(randomNucleotides(L));
+    initializeMutationTypeNuc("m1", 0.5, "f", 0.0);
+    // Jukes-Cantor at mu, plus CpG C->T (and G->A on the CpG's other strand) at KAPPA*mu (trinucleotide matrix)
+    defineConstant("MU", 2.5e-5); defineConstant("KAPPA", 10.0);
+    mm = matrix(rep(MU/3, 64*4), ncol=4);
+    for (i in 0:63) { mid = integerMod(integerDiv(i, 4), 4); mm[i, mid] = 0.0; }
+    for (a in 0:3) { mm[a*16 + 1*4 + 2, 3] = KAPPA*MU; mm[1*16 + 2*4 + a, 0] = KAPPA*MU; } // xCG: C->T ; CGx: G->A
+    initializeGenomicElementType("g1", m1, 1.0, mm);
+    initializeGenomicElement(g1, 0, L-1);
+    initializeRecombinationRate(0);
+}
+function (float)occ(object<Haplosome>$ h) {
+    s = sum(h.nucleotides(MSTART, MSTART+7, format="integer") == MOTIF);
+    return 1/(1+exp(-(s-6)*2));
+}
+mutation(m1) {
+    // gate CpG-transition mutations by methylation: methylated unless within 20 bp of a bound motif
+    if (mut.nucleotide == "T" | mut.nucleotide == "A") {
+        nuc = haplosome.nucleotides(max(0, (originalNuc==1) ? mut.position else mut.position-1), min(L-1, (originalNuc==1) ? mut.position+1 else mut.position), format="string");
+        if (nuc == "CG") {
+            m = (abs(mut.position - MSTART-4) < 20) ? 1 - occ(haplosome) else 1.0;
+            if (runif(1) > m) return F;
+        }
+    }
+    return T;
+}
+fitnessEffect() {
+    e = mean(c(occ(individual.haplosomes[0]), occ(individual.haplosomes[1])));
+    return exp(-50*(e-1)^2);
+}
+1 early() { sim.addSubpop("p1", N); }
+10000 late() {
+    h = p1.haplosomes;
+    o = sapply(h, "occ(applyValue);");
+    catn("mean occ " + mean(o) + "  segregating " + size(sim.mutations) + "  fixed " + size(sim.substitutions));
+}
