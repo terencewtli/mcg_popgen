@@ -2,6 +2,7 @@
 # Sync curated docs/code/small results from the working directory into the git mirror (github/mcg_popgen/), then
 # optionally commit. Content flows working dir -> mirror only; never hand-edit mirror copies of synced files.
 # Exception: md/JOURNAL.md, md/RESULTS.md, md/PROGRESS.md live ONLY in the mirror (edit them there).
+# realdata/ is owned by the cluster session and is never touched here (no rsync targets it).
 #
 # Usage: bash scripts/sync_to_github.sh ["commit message"]
 # With no message, stages and shows the status but does not commit. Never pushes.
@@ -16,6 +17,8 @@ GH=$PROJDIR/github/mcg_popgen
 MSG=${1:-}
 
 [ -d "$GH/.git" ] || { echo "no git repo at $GH" >&2; exit 1; }
+# the cluster session commits realdata/ to the same repo (md/ENDPOINT.md); pick its commits up first
+git -C "$GH" pull --ff-only --quiet || { echo "git pull --ff-only failed; resolve in $GH first" >&2; exit 1; }
 
 [ -f "$PROJDIR/README.md" ] && cp "$PROJDIR/README.md" "$GH/README.md"
 mkdir -p "$GH/md" "$GH/scripts"

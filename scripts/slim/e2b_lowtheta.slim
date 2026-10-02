@@ -1,0 +1,142 @@
+// E2b: E2 at realistic theta. Identical model to e2_stab.slim. Differences: the ancestral sequence is read from
+// ANCFILE (FASTA; the matching E2 run's final consensus, i.e. near that model's equilibrium composition), and
+// segregating variants are characterised in SLiM every VEVERY ticks instead of dumping whole populations.
+// Variant rows (OUT.var.tsv): tick, mutation id, position, derived nucleotide, derived-allele frequency, and the mean
+// effect of the derived allele on up to NBG non-carrier backgrounds: dR (methylation load), dO (occupancy), and
+// cpgloss (fraction of backgrounds where it destroys a CpG without creating one).
+//
+// Original E2 header:
+// E2: causal vs passenger methylation under stabilising selection at an intermediate optimum.
+// Maps are identical to E1 (e1_passenger.slim; Python mirror scripts/python/model.py). Mutation is methylation-gated.
+// The haplotype readout depends on GMODE:
+//   GMODE 0 (M0): neutral
+//   GMODE 1 (P) : g(x) = O(x)                                  (methylation is a passenger)
+//   GMODE 2 (C) : g(x) = exp(-R(x) / R0),  R(x) = sum_i m_i(x)  (methylated CpGs repress; R over the whole locus)
+// Fitness: E = (g(h1) + g(h2)) / 2;  w = exp(-KAPPA * (E - ESTAR)^2).
+// Haplotype readouts are cached by sequence (populations hold few distinct haplotypes); cache reset every 2000 ticks.
+//
+// Output after the burn-in, every EVERY ticks: tick, mean fitness, mean E and the consensus (majority) sequence
+// (OUT.ts.tsv); at NPOP evenly spaced times, every haplosome's sequence (OUT.popK.txt).
+// Required -d: N L ALPHA RCPG SEL(unused, 0) A0 A1 A2 W LAMBDA BETA S0 GMODE KAPPA ESTAR R0 BURN MEAS EVERY
+//              VEVERY NBG ANCFILE OUT
+initialize() {
+    initializeSLiMOptions(nucleotideBased=T);
+    defineConstant("MOTIF", c(3, 2, 0, 1, 3, 1, 0, 3));          // TGACTCAT
+    defineConstant("MSTART", asInteger(L / 2) - 4);
+    defineConstant("MCENTER", MSTART + 3.5);
+    initializeAncestralNucleotides(ANCFILE);
+    initializeMutationTypeNuc("m1", 0.5, "f", 0.0);
+    m1.convertToSubstitution = T;
+    mm = matrix(rep(ALPHA, 64 * 4), ncol=4);
+    for (i in 0:63) mm[i, integerMod(integerDiv(i, 4), 4)] = 0.0;
+    for (a in 0:3) {
+        mm[a * 16 + 1 * 4 + 2, 3] = RCPG * ALPHA;
+        mm[1 * 16 + 2 * 4 + a, 0] = RCPG * ALPHA;
+    }
+    initializeGenomicElementType("g1", m1, 1.0, mm);
+    initializeGenomicElement(g1, 0, L - 1);
+    initializeRecombinationRate(0.0);
+    defineGlobal("CACHE", Dictionary());
+}
+
+function (float$)occNuc(integer nuc) {
+    return 1.0 / (1.0 + exp(-BETA * (sum(nuc[MSTART:(MSTART + 7)] == MOTIF) - S0)));
+}
+function (integer)cpgPos(integer nuc) {
+    return which((nuc[0:(L - 2)] == 1) & (nuc[1:(L - 1)] == 2));
+}
+function (float)methAt(integer nuc, integer p) {
+    if (size(p) == 0) return float(0);
+    o = occNuc(nuc);
+    d = pmax(0.0, abs(p - MCENTER) - 4.0);
+    rho = rep(0.0, size(p));
+    if (A1 != 0) {
+        allp = cpgPos(nuc);
+        rho = sapply(p, "asFloat(sum(abs(allp - applyValue) <= W) - 1);");
+    }
+    return 1.0 / (1.0 + exp(-(A0 - A1 * rho - A2 * o * exp(-d / LAMBDA))));
+}
+function (float$)readout(integer nuc) {
+    if (GMODE == 1) return occNuc(nuc);
+    return exp(-sum(methAt(nuc, cpgPos(nuc))) / R0);
+}
+function (float$)readoutH(object<Haplosome>$ h) {
+    key = h.nucleotides();
+    v = CACHE.getValue(key);
+    if (isNULL(v)) {
+        v = readout(h.nucleotides(format="integer"));
+        CACHE.setValue(key, v);
+    }
+    return v;
+}
+
+mutation(m1) {
+    nv = mut.nucleotideValue;
+    pos = mut.position;
+    p = -1;
+    if ((originalNuc == 1) & (nv == 3) & (pos < L - 1)) {
+        if (haplosome.nucleotides(pos + 1, pos + 1, format="integer") == 2) p = pos;
+    } else if ((originalNuc == 2) & (nv == 0) & (pos > 0)) {
+        if (haplosome.nucleotides(pos - 1, pos - 1, format="integer") == 1) p = pos - 1;
+    }
+    if (p < 0) return T;
+    m = methAt(haplosome.nucleotides(format="integer"), p);
+    return (runif(1) < (1.0 + (RCPG - 1.0) * m) / RCPG);
+}
+
+fitnessEffect() {
+    if (GMODE == 0) return 1.0;
+    h = individual.haplosomes;
+    e = 0.5 * (readoutH(h[0]) + readoutH(h[1]));
+    return exp(-KAPPA * (e - ESTAR)^2);
+}
+
+1 early() {
+    sim.addSubpop("p1", N);
+    writeFile(OUT + ".ts.tsv", "gen\tmean_w\tmean_E\tconsensus");
+    writeFile(OUT + ".var.tsv", "gen\tmid\tpos\tnuc\tdaf\tdR\tdO\tcpgloss");
+}
+function (float)effects(integer x, integer pos, integer nv) {
+    // effect of setting x[pos] = nv on (R, O) and whether it destroys a CpG without creating one
+    y = x; y[pos] = nv;
+    px = cpgPos(x); py = cpgPos(y);
+    lost = size(setDifference(px, py)) > 0; gained = size(setDifference(py, px)) > 0;
+    return c(sum(methAt(y, py)) - sum(methAt(x, px)), occNuc(y) - occNuc(x), asFloat(lost & !gained));
+}
+1:1000000000 late() {
+    g = community.tick;
+    if (integerMod(g, 2000) == 0) defineGlobal("CACHE", Dictionary());
+    if ((g > BURN) & (integerMod(g - BURN, EVERY) == 0)) {
+        hs = p1.haplosomes;
+        nucs = matrix(sapply(hs, "applyValue.nucleotides(format='integer');"), nrow=size(hs), byrow=T);
+        cons = apply(nucs, 1, "c(sum(applyValue == 0), sum(applyValue == 1), sum(applyValue == 2), sum(applyValue == 3));");
+        cons = matrix(cons, nrow=4);
+        major = apply(cons, 1, "whichMax(applyValue);");
+        consStr = paste(c("A", "C", "G", "T")[major], sep="");
+        mw = 1.0; ge = 0.0;
+        if (GMODE != 0) {
+            ei = sapply(p1.individuals, "0.5 * (readoutH(applyValue.haplosomes[0]) + readoutH(applyValue.haplosomes[1]));");
+            ge = mean(ei);
+            mw = mean(exp(-KAPPA * (ei - ESTAR)^2));
+        }
+        writeFile(OUT + ".ts.tsv", g + "\t" + mw + "\t" + ge + "\t" + consStr, append=T);
+    }
+    if ((g > BURN) & (integerMod(g - BURN, VEVERY) == 0)) {
+        hs = p1.haplosomes;
+        lines = string(0);
+        for (mut in sim.mutations) {
+            c = hs.containsMutations(mut);
+            f = mean(c);
+            if ((f == 0.0) | (f == 1.0)) next;
+            bg = hs[!c];
+            if (size(bg) > NBG) bg = sample(bg, NBG);
+            e = rep(0.0, 3);
+            for (h in bg) e = e + effects(h.nucleotides(format="integer"), mut.position, mut.nucleotideValue);
+            e = e / size(bg);
+            lines = c(lines, g + "\t" + mut.id + "\t" + mut.position + "\t" + mut.nucleotideValue + "\t" + f + "\t" +
+                      e[0] + "\t" + e[1] + "\t" + e[2]);
+        }
+        if (size(lines)) writeFile(OUT + ".var.tsv", lines, append=T);
+    }
+    if (g == BURN + MEAS) sim.simulationFinished();
+}

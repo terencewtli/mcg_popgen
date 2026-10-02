@@ -5,6 +5,7 @@ footprint of being *causal* for fitness, as opposed to a *passenger* of TF bindi
 
 - `md/CHATGPT.md`, `md/CLAUDE_REVISIONS.md`: original spec and revisions
 - `md/PLAN.md`: current compact analysis plan
+- `md/ENDPOINT.md`: endpoint checklist for the simulation phase; cluster hand-off and two-account repo rules
 - `tex/theory.tex` → `pdf/theory.pdf`: full generative model and validation theory
 - Results, in order:
   - `md/E0.md`: simulator validation (18/18 checks pass)
