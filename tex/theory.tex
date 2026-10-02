@@ -143,6 +143,10 @@ The haplotype readout $g(\cdot)$ is what distinguishes the models:
 \text{P (passenger): } g(x)=O(x);\qquad \text{C (causal, E2): } g(x)=1-\bar m_{\text{prom}}(x);\qquad
 \text{M0 (neutral): } \kappa=0.
 \end{equation}
+\textbf{Optimum.} E1 uses $E^*=1$. Because $O\le0.982$, that is directional selection with diminishing returns,
+not true stabilising selection. E2 uses an intermediate optimum (e.g.\ $E^*=0.5$). Then many genotypes sit at the
+optimum, which allows compensatory turnover and lets methylation be conserved while sequence diverges.
+
 \textbf{Reporting selection.} $\kappa$ by itself is not interpretable. For a genotype $G$ we report
 $2N s_G$, with $s_G=1-w_G/w_{8/8}$. $\kappa$ is set so that one heterozygous motif mismatch has $2Ns_{8/7}=10$. That gives
 $\kappa=11.7$ at $N=100$ and $2Ns=30,\ 108,\ 181$ for $7/7$, $8/6$, $8/5$. The motif is under strong selection and
@@ -251,6 +255,30 @@ neutral-flank expectation, and SLiM includes everything.
 map $f\mapsto f(m(\rho(f)))$ can have two stable fixed points: a methylated, CpG-poor state and an unmethylated,
 CpG-rich island. Whether an island self-sustains after the TF is lost (M0\_meth\_fb) or needs the TF to seed it
 (P\_meth\_fb) is an empirical question for E1.
+
+\section{P0: per-CpG priors across species}\label{sec:p0}
+Extend the two-state chain of Section~\ref{sec:e1} with selection $S=2Ns$ favouring the CpG (from selection on
+the CpG, or from gBGC). Under origin-fixation, the loss and gain rates become
+\begin{equation}
+a=\alpha\,\ell(m)\,\varphi(-S),\qquad b=\alpha\,\gamma\,\varphi(S),\qquad \varphi(S)=\frac{S}{1-e^{-S}},
+\end{equation}
+where $\varphi$ is $2N\times$ Kimura's $u$ relative to neutral, and $m$ is \emph{germline} methylation. Because
+$\varphi(S)/\varphi(-S)=e^{S}$, the stationary CpG frequency is $f=\gamma e^{S}/(\gamma e^{S}+\ell(m))$: the neutral
+stationary distribution weighted by $e^{S\cdot\text{state}}$, as in Sella \& Hirsh. For two species separated by
+total branch length $T$, measured through neutral non-CpG divergence $D=3\alpha T$, reversibility gives
+\begin{equation}
+\Pr(\text{CpG in B}\mid\text{CpG in A})=f+(1-f)\,e^{-(a+b)T}.
+\end{equation}
+\textbf{Polymorphism.} For new mutations with $\sigma=2Ns$, the Poisson-random-field (Sawyer--Hartl) density of
+derived-allele frequency, per unit $\theta$, is
+\begin{equation}
+\phi_\sigma(x)=\frac{1-e^{-\sigma(1-x)}}{(1-e^{-\sigma})\,x(1-x)}\quad\xrightarrow{\sigma\to0}\quad\frac1x .
+\end{equation}
+Expected segregating sites in a sample of $n$ are $\theta\int_0^1\phi_\sigma(x)\,[1-x^n-(1-x)^n]\,dx$; SLiM agrees
+at $\sigma=0,-1,-2,-4,-8$. A change in germline $m$ rescales polymorphism and divergence of CpG-loss alleles by the
+same factor $\ell(m)$, so $P/D$ is unchanged. Selection gives
+$P/D \propto \int\phi_{-S}/\varphi(-S)$, which is 1.5, 2.4 and 7.8 at $S=1,2,4$. This is the McDonald--Kreitman-type
+contrast that separates mutation from selection, where divergence and o/e alone lie on a ridge in $(m,S)$.
 
 \section{Assumptions made explicit}
 \begin{enumerate}
