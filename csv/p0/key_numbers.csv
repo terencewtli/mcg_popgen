@@ -1,0 +1,29 @@
+quantity,value
+"o/e, m=1, S=0, r=10",0.26229508196721313
+"o/e, m=0, S=0, r=10",1.0
+"S for o/e=0.6 at m=1, r=10",0.8491514290365265
+"m for o/e=0.6 at S=0, r=10",0.23703703703703707
+"o/e, m=1, S=0, r=15",0.186046511627907
+"o/e, m=0, S=0, r=15",1.0
+"S for o/e=0.6 at m=1, r=15",1.197458123304742
+"m for o/e=0.6 at S=0, r=15",0.15238095238095242
+"o/e, m=1, S=0, r=20",0.14414414414414414
+"o/e, m=0, S=0, r=20",1.0
+"S for o/e=0.6 at m=1, r=20",1.455287232606842
+"m for o/e=0.6 at S=0, r=20",0.11228070175438598
+"P(CpG in B | CpG in A), human-chimp, m=0, S=0, r=15",0.9763045952516818
+"P(CpG in B | CpG in A), human-chimp, m=0, S=1, r=15",0.9861471496113733
+"P(CpG in B | CpG in A), human-chimp, m=0, S=2, r=15",0.9925291195530676
+"P(CpG in B | CpG in A), human-chimp, m=0, S=4, r=15",0.9982163153387684
+"P(CpG in B | CpG in A), human-chimp, m=1, S=0, r=15",0.8729420009089907
+"P(CpG in B | CpG in A), human-chimp, m=1, S=1, r=15",0.9239973656284738
+"P(CpG in B | CpG in A), human-chimp, m=1, S=2, r=15",0.9583971816517056
+"P(CpG in B | CpG in A), human-chimp, m=1, S=4, r=15",0.9899345198244187
+"P(CpG in B | CpG in A), human-macaque, m=0, S=0, r=15",0.8786107682679171
+"P(CpG in B | CpG in A), human-macaque, m=0, S=1, r=15",0.9276251670478671
+"P(CpG in B | CpG in A), human-macaque, m=0, S=2, r=15",0.9605166775997325
+"P(CpG in B | CpG in A), human-macaque, m=0, S=4, r=15",0.9905132978149296
+"P(CpG in B | CpG in A), human-macaque, m=1, S=0, r=15",0.48068566199162077
+"P(CpG in B | CpG in A), human-macaque, m=1, S=1, r=15",0.6535505676042141
+"P(CpG in B | CpG in A), human-macaque, m=1, S=2, r=15",0.7960269256929344
+"P(CpG in B | CpG in A), human-macaque, m=1, S=4, r=15",0.9474318862060356

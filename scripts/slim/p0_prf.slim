@@ -1,0 +1,31 @@
+// P0 check of the Poisson-random-field polymorphism density under selection (Sawyer & Hartl 1992), which the
+// primate priors use for the polymorphism/divergence ratio of CpG-loss alleles. Infinite-sites-like: many nearly
+// unlinked sites (4Nr = 2 per bp), new mutations with selection coefficient S (h = 0.5; fitness 1, 1+S/2, 1+S),
+// sigma = 2 N S. After a 10N burn-in, NSAMPLES samples of NSAMP haplosomes taken every N generations; output = number
+// of segregating mutations in each sample.
+// Required -d: N L MU S NSAMP NSAMPLES OUT
+initialize() {
+    initializeMutationRate(MU);
+    initializeMutationType("m1", 0.5, "f", S);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, L - 1);
+    initializeRecombinationRate(2.0 / (4 * N));
+}
+1 early() {
+    sim.addSubpop("p1", N);
+    writeFile(OUT, "gen\tseg");
+}
+1:1000000000 late() {
+    g = community.tick;
+    if ((g > 10 * N) & (integerMod(g, N) == 0)) {
+        h = sample(p1.haplosomes, NSAMP);
+        muts = unique(h.mutations);
+        nseg = 0;
+        if (size(muts)) {
+            c = sapply(muts, "sum(h.containsMutations(applyValue));");
+            nseg = sum((c > 0) & (c < NSAMP));
+        }
+        writeFile(OUT, g + "\t" + nseg, append=T);
+        if (g >= 10 * N + NSAMPLES * N) sim.simulationFinished();
+    }
+}
