@@ -1,0 +1,87 @@
+\documentclass[10pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\setlist{itemsep=1pt,topsep=3pt}
+\graphicspath{{../pdf/}}
+\title{Causal vs passenger DNA methylation in a population-genetic model\\[2pt]
+\large Summary of the simulation phase (E0--E4)}
+\author{mcg\_popgen working notes}
+\date{2026-10-01}
+\begin{document}
+\maketitle
+
+\noindent\textbf{Question.} Which population-genetic signatures distinguish \emph{causal} methylation (fitness reads
+methylation) from \emph{passenger} methylation (methylation is set by TF binding; fitness reads binding)? At what
+selection strength, and which survive realistic $\theta$ and meQTL detection?
+
+\noindent\textbf{Model.} A Wright--Fisher population (SLiM 5.2) carries a 300-bp locus with one TF motif. Occupancy
+$O$ and per-CpG methylation $m$ are deterministic functions of each haplotype's own sequence, and a bound TF protects
+nearby CpGs. Methylated CpGs mutate up to $r=20\times$ faster. Fitness is stabilising, at an intermediate optimum, on
+$O$ (passenger), on the methylation load $R=\sum m$ (causal), on both, or on $O(1-m_{\text{motif CpG}})$
+(methylation-sensitive TF). Results are reported as $2Ns$ and $\theta$; the headline runs use $\theta=0.001$. Full
+specification: \texttt{pdf/theory.pdf}. The simulator was validated against analytic results and an exact oracle
+(E0, 18/18 checks), with Python--SLiM parity $\le5\times10^{-7}$ and rescaling invariance.
+
+\section*{1. Passive retention and the mutation--selection ridge}
+\includegraphics[width=\textwidth]{e1/e1_passenger.png}
+
+\noindent\textbf{F1 (E1).} With no selection on any CpG, a selected TF leaves a $2.6\times$ CpG enrichment within
+25\,bp, but only when mutation is methylation-gated (panel A, green vs orange). The footprint scales with protection
+width $\lambda$ and with $r$ (D, E), and rescaling holds (F).
+
+\includegraphics[width=\textwidth]{p0/priors.png}
+
+\noindent\textbf{F2--F3 (P0).} CpG o/e cannot tell germline hypomethylation from weak selection on CpGs (A, B): o/e
+0.6 needs either $m\approx0.15$ with no selection, or $S\approx1.2$ on methylated CpGs. Cross-species conservation
+has the same ambiguity (C). The polymorphism/divergence ratio of CpG-loss alleles breaks the tie (D): $P/D=1$ for a
+change in mutation rate, and rises with selection.
+
+\section*{2. Causal vs passenger at realistic $\theta$}
+\includegraphics[width=\textwidth]{e2b/e2b_theta.png}
+
+\noindent\textbf{F3--F5, F8 (E2, E2b).} Passenger methylation leaves no trace in CpG-only variants ($P/D\approx1$,
+frequencies neutral). Causal methylation raises $P/D$ to 2--11 and depletes those variants by 22--69\%; the signals
+are stronger at human-like $\theta$ (A, B). Methylation conserved through CpG positional turnover requires weak
+per-CpG selection; strong steps freeze positions at realistic $\theta$ (C).
+
+\includegraphics[width=\textwidth]{e3/e3_combined.png}
+
+\noindent\textbf{F5, F6, F9, F10 (E3).} When TF and methylation are both causal, the locus shows both signatures:
+motif conserved and CpG-only variants depleted. Lineages commit to alternative (motif strength, methylation load)
+optima with the same expression (A). A methylation-sensitive TF is indistinguishable from its passenger control,
+because the bound TF self-protects its CpG.
+
+\section*{3. Does it survive meQTL detection?}
+\includegraphics[width=\textwidth]{e4/e4_detection.png}
+
+\noindent\textbf{F4--F7 (E4).} Compare detected CpG-SNP meQTLs with a neutral model put through the same detection
+(A). The ratio is $1.00\pm0.05$ under every passenger model, and 0.45--0.90 at $n=30{,}000$ under causal models with
+per-CpG $2Ns\gtrsim2$. Motif-SNP depletion appears whenever a TF is selected (B). The naive effect--frequency
+correlation is as negative under passenger (detection bias) as under causal (C).
+
+\section*{4. Predictions for real data}
+\begin{enumerate}[label=R\arabic*.]
+\item CpG excess at regulatory elements tracks \emph{germline} hypomethylation; soma-only elements show none unless
+  CpGs are selected or gBGC acts.
+\item Stratified by germline methylation, CpG-loss $P/D=1$ where only the mutation rate differs and $>1$ where CpGs
+  are selected. Non-CpG W$\leftrightarrow$S sites control for gBGC.
+\item CpG-SNP meQTLs outside motifs: ascertainment-matched MAF ratio $=1$ under passenger, $<1$ (falling with $n$)
+  under causal. Include low-frequency variants.
+\item Pooled meQTL effect--MAF correlations without a matched null are not evidence of selection.
+\item Weak per-CpG constraint goes with CpG turnover at conserved methylation; strong constraint conserves CpG
+  positions.
+\item Matched expression is compatible with divergent motif strength and methylation, so methylation divergence is
+  not expression divergence.
+\item Sign tests on methylation divergence need a mutation-aware null that depends on each gene set's CpG content and
+  germline methylation (not yet simulated).
+\end{enumerate}
+
+\noindent\textbf{Limits.} The biology is a toy: one locus, a hand-set map, cis only, no methylation--binding
+feedback. At $N=100$ the minimum MAF is 0.005, so power in E4 is probably underestimated. The detection model is
+analytic, with no LD. \textbf{First cluster jobs:} a check at real $N=10^4$; real-data analysis B, or fitting the map
+to HPRC2 haplotype-resolved methylation (\texttt{md/REAL\_DATA.md}, \texttt{md/ENDPOINT.md}).
+\end{document}

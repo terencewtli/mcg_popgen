@@ -1,6 +1,6 @@
 # Endpoint for the simulation phase, and hand-off to real data
 
-Agreed 2026-10-01. The aim is a finished, validated simulation unit within about two days. After that the project moves
+Agreed 2026-10-01. **Simulation phase closed 2026-10-01** (items 1–7 and 9 done; item 8 is the first cluster job). The aim is a finished, validated simulation unit within about two days. After that the project moves
 to the cluster and works exclusively on real data.
 
 ## The question the simulation phase answers
@@ -22,8 +22,8 @@ supports it.
 | 5 | **E2b: E2 at realistic θ** (4Nu = 0.001, CpG recurrence ≈ human) | done: passenger still neutral; causal P/D 2–11; CpG turnover with conserved R only at weak per-CpG 2Ns | `md/E2b.md` |
 | 6 | **E3: combined model**: TF and methylation both causal (g = O·exp(−R/R₀)), plus a methylation-sensitive TF variant (m lowers O, CRE motif) | done: CP shows both signatures, lineages commit to alternative TF/methylation optima; methylation-sensitivity invisible (self-protection) | `md/E3.md` |
 | 7 | **E4: meQTL detection layer**: analytic power applied to simulated variants (detected if n·2p(1−p)β²/σ² passes the threshold; n = 500, 5,000, 30,000). Does the CpG-SNP vs motif-SNP difference in effect–frequency survive detection bias under M0, P and C? | done: ascertainment-matched CpG-SNP MAF test has the right null (passenger = 1.00) and detects causal at 2Ns ≳ 2 (0.45–0.90 at n = 30k); naive effect–MAF correlation is biased under passenger | `md/E4.md` |
-| 8 | One real-N check (N = 10⁴, no rescaling) for the headline condition: overnight on the laptop, or the first cluster job | | in `md/E2b.md` or `md/E4.md` |
-| 9 | **Consolidated summary**: `md/SUMMARY.md` (numbered predictions → supporting experiment → real-data analysis A–D in `md/REAL_DATA.md`) plus a figure-led PDF | | `md/SUMMARY.md` |
+| 8 | One real-N check (N = 10⁴, no rescaling) for the headline condition: overnight on the laptop, or the first cluster job | handed to the cluster (first job; laptop runtime too long) | `md/SUMMARY.md` hand-off §1 |
+| 9 | **Consolidated summary**: `md/SUMMARY.md` (numbered predictions → supporting experiment → real-data analysis A–D in `md/REAL_DATA.md`) plus a figure-led PDF | done 2026-10-01 | `md/SUMMARY.md`, `pdf/summary.pdf` |
 
 **Deliberately out of scope**, so the phase actually ends:
 - large phase-diagram sweeps (two κ values per model bracket the boundary);

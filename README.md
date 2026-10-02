@@ -4,6 +4,7 @@ Small forward population-genetic simulations (SLiM 5.2) of sequence-encoded DNA 
 footprint of being *causal* for fitness, as opposed to a *passenger* of TF binding? Simulation only; it runs on a laptop.
 
 - `md/CHATGPT.md`, `md/CLAUDE_REVISIONS.md`: original spec and revisions
+- **Start here: `md/SUMMARY.md` (or `pdf/summary.pdf`)**: findings F1–F10 and real-data predictions R1–R7
 - `md/PLAN.md`: current compact analysis plan
 - `md/ENDPOINT.md`: endpoint checklist for the simulation phase; cluster hand-off and two-account repo rules
 - `tex/theory.tex` → `pdf/theory.pdf`: full generative model and validation theory
