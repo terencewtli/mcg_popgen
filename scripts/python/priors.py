@@ -74,6 +74,11 @@ def prf_singletons(sigma, n):
     return quad(lambda x: prf_density(x, sigma) * n * x * (1 - x) ** (n - 1), 0, 1, limit=200)[0]
 
 
+def pdr_at(S, n=PRF_NSAMP):
+    """P/D of a deleterious allele (2Ns = S) relative to neutral: PRF polymorphism / Kimura divergence."""
+    return prf_seg(-S, n) / prf_seg(0, n) / float(phi(-S))
+
+
 # ---------------------------------------------------------------------------------------------------------------
 def prf_task(job):
     sigma, rep = job

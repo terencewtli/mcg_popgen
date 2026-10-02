@@ -90,3 +90,17 @@ def selection_table(P):
     w = lambda a, b: np.exp(-P.SEL * (1 - 0.5 * (o[a] + o[b])) ** 2)
     rows = {'8/7': w(8, 7), '7/7': w(7, 7), '8/6': w(8, 6), '8/5': w(8, 5), '8/0': w(8, 0), '0/0': w(0, 0)}
     return {k: 2 * P.N * (1 - v / w(8, 8)) for k, v in rows.items()}
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# E2 readouts (scripts/slim/e2_stab.slim): GMODE 1 = P, g = O; GMODE 2 = C, g = exp(-R / R0), R = sum of m over the
+# locus. Fitness w = exp(-KAPPA * (E - ESTAR)^2), E = mean readout of the two haplotypes.
+
+def meth_load(nuc, P):
+    return float(np.sum(meth_at(nuc, cpg_pos(nuc), P)))
+
+
+def readout(nuc, P, gmode, R0=3.0):
+    if gmode == 1:
+        return float(occ(nuc, P))
+    return float(np.exp(-meth_load(nuc, P) / R0))

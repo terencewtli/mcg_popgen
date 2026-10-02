@@ -75,7 +75,7 @@ with r. The quantity of interest is **how much "CpG conservation" is free**: the
 flanks, with s = 0 on every CpG. This is the mechanism behind Cohen, Kenigsberg & Tanay 2011, rebuilt as a forward model.
 
 **Status (2026-10-01).** E0 is done (`md/E0.md`): all checks pass. E1 is done (`md/E1.md`): a 2.6× CpG footprint
-from gating alone. P0 is done (`md/PRIORS.md`): o/e and divergence alone cannot separate germline hypomethylation from weak selection (S ≈ 1); the CpG-loss P/D ratio can. E2 is next.
+from gating alone. P0 is done (`md/PRIORS.md`): o/e and divergence alone cannot separate germline hypomethylation from weak selection (S ≈ 1); the CpG-loss P/D ratio can. E2 is done (`md/E2.md`): under C, methylation load is conserved while ~all CpG positions turn over, and R-only variants show reduced MAF and P/D 1.9–2.6; passenger is indistinguishable from neutral on both. Real-data translation: `md/REAL_DATA.md`. Next candidates: C+P combined model; realistic θ plus an ascertainment layer.
 
 **E2: causal vs passenger, matched (the core experiment).** *Revised 2026-10-01: use an intermediate optimum*
 *(e.g. E\* = 0.5 for promoter methylation, and the equivalent for occupancy). That makes selection truly stabilising,*

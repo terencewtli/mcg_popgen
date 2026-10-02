@@ -280,6 +280,29 @@ same factor $\ell(m)$, so $P/D$ is unchanged. Selection gives
 $P/D \propto \int\phi_{-S}/\varphi(-S)$, which is 1.5, 2.4 and 7.8 at $S=1,2,4$. This is the McDonald--Kreitman-type
 contrast that separates mutation from selection, where divergence and o/e alone lie on a ridge in $(m,S)$.
 
+\section{E2: stabilising selection on a sequence-encoded trait}\label{sec:e2}
+Let a variant change one haplotype's readout by $\Delta g$, in a population whose mean $E$ is near $E^*$. Then the
+heterozygote's log-fitness changes by
+\begin{equation}
+\log\frac{w_{\text{het}}}{w}=-\kappa\Big[\big(E-E^*+\tfrac{\Delta g}{2}\big)^2-(E-E^*)^2\Big]
+=-\kappa\,\Delta g\,(E-E^*)-\kappa\,\frac{\Delta g^2}{4}.
+\end{equation}
+At the optimum the first-order term vanishes, so $s_{\text{het}}\approx\kappa(\Delta g/2)^2$: selection is
+\emph{quadratic} in the effect. This has three consequences.
+\begin{itemize}
+\item Small-effect variants are nearly neutral. Under a degenerate readout ($R=\sum_i m_i$, one CpG at a time) each
+  step is weak, but the sum is held tightly.
+\item With the trait additive, stabilising selection acts against the \emph{minor} allele whatever the sign of its
+  effect: an apparent underdominance of order $\kappa\Delta g^2$ (Robertson 1956). Effect--frequency tests therefore
+  use $|\Delta g|$.
+\item Compensation. A loss followed by a gain elsewhere returns $R$ to the optimum, so long-run substitution at
+  individual CpGs is faster than a directional model with the same $s$ predicts. P0's directional $P/D$ is an upper
+  bound.
+\end{itemize}
+Turnover between optimal genotypes needs every intermediate step to be weak. P's motif has 28 optimal
+configurations, but each one-step neighbour costs $2Ns\approx14$--$72$, so turnover is negligible. C's steps cost
+$2Ns\approx2$--$11$, so CpG positions turn over almost completely while $R$ is conserved.
+
 \section{Assumptions made explicit}
 \begin{enumerate}
 \item Methylation is regenerated from sequence each generation. There are no epialleles.
