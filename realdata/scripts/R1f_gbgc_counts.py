@@ -10,7 +10,8 @@ events whose derived allele would create a CpG (derived C before an ancestral G,
   P  1000G SNV with one allele ancestral (derived count = AC if REF is ancestral, AN - AC otherwise); 0 < dac < AN
 Elements: coding (Ensembl-canonical CDS) > CGI > cCRE class (PLS > pELS > dELS > CTCF-only > DNase-H3K4me3) >
 background. phyloP is not used (it includes human, so it is circular with D).
-Output: counts by element x direction x 1 Mb block (P, Ps = P with derived count >= 2, D).
+Output: counts by element x direction x 1 Mb block (P, Ps = P with derived count >= 2, D); with --human-sperm /
+--loyfer also by regional germline and somatic m bins (R2b definitions; the matched comparator for R1e / R2).
 """
 from __future__ import annotations
 
@@ -26,6 +27,7 @@ import pysam
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from R1b_ancestral_cpg import load_axt  # noqa: E402
 from R1d_annotate import CCRE_ORDER, interval_mask  # noqa: E402
+from R2b_cpg_soma import GERM_BINS, GERM_LABELS, SOMA_BINS, SOMA_LABELS, human_sperm_arrays, loyfer_arrays, regional  # noqa: E402
 
 STRONG = np.zeros(256, dtype=bool)
 STRONG[[ord('C'), ord('G')]] = True
@@ -55,6 +57,8 @@ def main() -> None:
     ap.add_argument('--cgi', required=True)
     ap.add_argument('--gtf', required=True)
     ap.add_argument('--out', required=True)
+    ap.add_argument('--human-sperm', help='R1c human.hg38.bed; adds germ = regional human sperm m bin (+-500 bp)')
+    ap.add_argument('--loyfer', help='R2a chrN.tsv.gz; adds soma_med / soma_min = regional somatic m bins (+-500 bp)')
     a = ap.parse_args()
 
     h = np.frombuffer(pysam.FastaFile(a.fasta).fetch(a.chrom).upper().encode(), dtype=np.uint8)
@@ -117,7 +121,17 @@ def main() -> None:
     ev['P'] = (ev.kind == 'P').astype(int)
     ev['Ps'] = ((ev.kind == 'P') & (ev.dac >= 2)).astype(int)
     ev['D'] = (ev.kind == 'D').astype(int)
-    out = ev.groupby(['element', 'direction', 'block'])[['P', 'Ps', 'D']].sum().reset_index()
+    keys = ['element', 'direction', 'block']
+    if a.human_sperm:
+        hp, hm = human_sperm_arrays(a.human_sperm, a.chrom, h.tobytes().decode())
+        ev['germ'] = pd.cut(regional(hp, hm, ev.i.values), GERM_BINS, labels=GERM_LABELS).astype(str)
+        keys.append('germ')
+    if a.loyfer:
+        lp, med, mn = loyfer_arrays(a.loyfer, 40)
+        ev['soma_med'] = pd.cut(regional(lp, med, ev.i.values), SOMA_BINS, labels=SOMA_LABELS).astype(str)
+        ev['soma_min'] = pd.cut(regional(lp, mn, ev.i.values), SOMA_BINS, labels=SOMA_LABELS).astype(str)
+        keys += ['soma_med', 'soma_min']
+    out = ev.groupby(keys)[['P', 'Ps', 'D']].sum().reset_index()
     out.to_csv(a.out, sep='\t', index=False, compression='gzip')
     tot = ev.groupby('direction')[['P', 'D']].sum()
     print((tot.assign(PD=tot.P / tot.D)).to_string(), flush=True)

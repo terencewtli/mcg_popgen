@@ -142,3 +142,53 @@
      intragenic CGIs?
   3. Characterise the nocov stratum.
   4. Run R2, the slope against somatic m from Loyfer at fixed germline m.
+
+## 2026-10-03 ~15:30: germline-matched comparator and R2 (P/D vs somatic m)
+
+Setup (`scripts/R2b_cpg_soma.py`, `R2c_pd_soma.py`; R1f rerun with `--human-sperm --loyfer`; tables in `tsv/R2/`):
+- **Regional measures.** At fixed human losses there is no human CpG, so germline and somatic m are measured
+  regionally: the mean of the other CpGs within ±500 bp, for P and D sites alike. Regional vs site somatic median m
+  correlate at r = 0.93 (chr22).
+- **CpG side:** conserved germline bin (chimp site m and human regional m agree); CpGs in strong HOMER hits excluded.
+- **Non-CpG side:** S>W changes, human regional germline bin.
+- Joint 1 Mb block bootstrap, 200 replicates.
+
+**Germline-matched comparator** (excess = CpG P/D relative to its background ÷ S>W P/D relative to its background,
+both in the same germline bin):
+
+| germline | CGI | PLS | pELS | dELS | CTCF-only | coding |
+|---|---|---|---|---|---|---|
+| high | **1.95 (1.77–2.20)** | 1.22 (1.12–1.35) | 1.08 (1.03–1.13) | 1.05 (1.03–1.07) | 0.98 (0.91–1.08) | 1.44 (1.39–1.49) |
+| low | 1.06 (1.01–1.11) | 0.83 (0.76–0.93) | 0.86 (0.82–0.92) | 0.95 (0.88–1.03) | – | 1.08 (1.00–1.19) |
+
+- The germline-methylated CGI excess **survives the matched comparator**.
+- Deficits as low as 0.83 also appear (germline-low PLS / pELS). Read ±15% as the scale of residual level differences
+  between CpG and non-CpG P/D, not as signal. Only the germline-high CGI excess (and PLS, marginally) clearly exceeds it.
+- Coding 1.44 is composition: CpG transitions in CDS are more often missense than the average S>W change. It is not a
+  methylation effect.
+
+**R2: ratio = CpG P/D ÷ S>W P/D, by regional somatic m, at fixed germline bin (non-coding):**
+- **Germline-high, the bulk (≈ 1.0M CpG events):** flat.
+  - soma_min: 0.92 / 0.89 / 0.94 / 0.91 across bins; top / bottom 0.98 (0.91–1.06). Elements only: 1.00 (0.95–1.06).
+  - soma_med: 0.97 → 0.89 → 0.92 over 0.2–1. The top / bottom 0.73 is driven by the small 0–0.2 bin (196 D).
+  - **No rise in CpG-loss constraint with somatic methylation**, the passenger prediction. Sensitivity bound: a rise
+    of more than ~6% from somatically unmethylated to methylated is excluded (soma_min, elements).
+- **Germline-low CpGs: a rise.** soma_med top / bottom 1.13 (1.08–1.19), elements 1.27 (1.16–1.39); soma_min
+  elements 1.23 (1.07–1.44). These CpGs are unmethylated in sperm but methylated in soma. A candidate, but the obvious
+  confounder is germline mutation rate: CpGs unmethylated in sperm and methylated in oocyte or early embryo mutate
+  faster than the sperm stratum implies. **Needs the oocyte / embryo methylome (Okae 2014; Guo 2014) as a rate
+  covariate before reading.**
+- **Germline-high CGI:** soma_med 1.39 (0.5–0.8) → 1.83 (0.8–1), trend 1.31 (0.92–1.71); soma_min flat (1.15,
+  0.85–1.59). The CGI excess does not clearly scale with somatic m.
+
+**Overall:**
+- For the large majority of CpGs (germline-methylated, regulatory or not), CpG loss is no more constrained than other
+  S>W changes in matched context, and constraint does not track somatic methylation. This fits methylation as a
+  passenger at per-CpG 2Ns ≳ 1 (the simulation's F4 / R2 outcome 1).
+- Two candidate exceptions remain:
+  1. ~5k germline-methylated CGI CpGs: excess ~1.9, not dose-dependent. What are they (imprinted gDMRs?
+     germline-specific promoters)?
+  2. germline-unmethylated, soma-methylated CpGs: rising. The oocyte methylome must come first.
+- Next: download Okae 2014 oocyte / blastocyst WGBS (JGA / DDBJ?) or Guo 2014 (GSE49828); annotate the germline-high
+  CGIs with imprinting control regions; translate the bound into per-CpG S with a stabilising-selection simulation
+  (laptop).
