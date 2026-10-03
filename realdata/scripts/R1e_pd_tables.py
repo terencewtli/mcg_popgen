@@ -12,7 +12,8 @@ methylation (h_reg, CpGs within +-500 bp) in the same bin; a human-specific chan
 otherwise make P/D != 1 without selection (REVIEW 3, F3).
 
 Element strata: cCRE class, CGI, coding consequence at the event position (positive control: missense / stop vs
-synonymous), and background (no cCRE, no CGI, not coding, phyloP < 0).
+synonymous), and background (no cCRE, no CGI, not coding). phyloP is not used to define background (it includes
+human, so it is circular with D).
 
 Report: P/D with 95% CI from a 1 Mb block bootstrap, and P/D relative to background in the same germline bin.
 P/D is computed on counts, so opportunity (number of sites) cancels.
@@ -68,6 +69,11 @@ def main() -> None:
     ap.add_argument('--outdir', required=True)
     ap.add_argument('--n-boot', type=int, default=200)
     ap.add_argument('--min-cov', type=int, default=5)
+    ap.add_argument('--motif-dir', help='R1g per-chromosome motif tables; needed for --motif-mode other than all')
+    ap.add_argument('--motif-mode', default='all', choices=['all', 'exclude_any', 'exclude_strong', 'only_strong'],
+                    help='exclude_any: drop CpGs in any HOMER hit; exclude_strong: drop hits with margin >= '
+                         '--strong; only_strong: keep only those (the F6 "TF-selected" reference)')
+    ap.add_argument('--strong', type=float, default=2.0)
     a = ap.parse_args()
     rng = np.random.default_rng(1)
 
@@ -75,6 +81,12 @@ def main() -> None:
     for f in sorted(glob.glob(a.annot_glob)):
         x = pd.read_csv(f, sep='\t', dtype={'snv_pos': str, 'snv_kind': str, 'cons_C': str, 'cons_G': str})
         x['chrom'] = f.split('/')[-1].split('.')[0]
+        if a.motif_mode != 'all':
+            mo = pd.read_csv(f'{a.motif_dir}/{x.chrom.iloc[0]}.motif.tsv.gz', sep='\t')
+            x = x.merge(mo[['pos', 'n_hits', 'best_margin']], on='pos', how='left')
+            strong = x.best_margin >= a.strong
+            keep = {'exclude_any': x.n_hits == 0, 'exclude_strong': ~strong, 'only_strong': strong}[a.motif_mode]
+            x = x[keep.values]
         parts.append(x)
         print(f'{f}: {len(x):,}', flush=True)
     d = pd.concat(parts, ignore_index=True)
@@ -90,8 +102,9 @@ def main() -> None:
     d['coding'] = np.where(d.cons == '.', 'noncoding', d.cons)
     d['element'] = np.where(d.coding != 'noncoding', 'coding',
                    np.where(d.cgi == 1, 'CGI',
-                   np.where(d.ccre != 'none', d.ccre,
-                   np.where(d.phylop < 0, 'background', 'other_noncoding'))))
+                   np.where(d.ccre != 'none', d.ccre, 'background')))
+    # phyloP is NOT used: phyloP100way includes human, so sites with a human-lineage substitution score lower, and a
+    # phyloP < 0 'background' is enriched for D (P/D biased down; the phyloP >= 0 remainder biased up)
 
     out = {
         'overall': table(d.assign(all='all'), ['all'], a.n_boot, rng),
@@ -108,7 +121,8 @@ def main() -> None:
     bg = t[t.element == 'background'].set_index('germ_cons').PD
     t['PD_rel_bg'] = t.PD / t.germ_cons.map(bg)
     for k, t in out.items():
-        t.to_csv(f'{a.outdir}/R1e_pd_{k}.tsv', sep='\t', index=False, float_format='%.4g')
+        tag = '' if a.motif_mode == 'all' else f'.{a.motif_mode}'
+        t.to_csv(f'{a.outdir}/R1e_pd_{k}{tag}.tsv', sep='\t', index=False, float_format='%.4g')
         print(f'\n== {k}\n{t.to_string(index=False, float_format=lambda v: f"{v:.3g}")}', flush=True)
 
 
