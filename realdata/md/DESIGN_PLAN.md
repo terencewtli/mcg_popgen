@@ -26,7 +26,7 @@ can be tested on **all** CpG-loss variants, with methylation measured in referen
 
 | data | use | source / status |
 |---|---|---|
-| Human polymorphism | P (CpG-loss SNVs, SFS) | 1000G NYGC 30x, 3,202 samples; **on disk** (`demux_benchmark/pool_design/vcf/1000G/by_chrom/`). Use the 2,504 unrelated samples. At n ≈ 5,000 haplotypes, methylated-CpG transitions are far from saturation (θ_CpG ≈ 4×10⁻³ → ~4% of methylated CpGs polymorphic), so recurrence is a small correction, not a blocker. |
+| Human polymorphism | P (CpG-loss SNVs, SFS) | 1000G NYGC 30x, 3,202 samples; **on disk** (`/u/project/cluo/terencew/demux_benchmark/pool_design/vcf/1000G/by_chrom/`; its chr1 is corrupt past 190.67 Mb, re-downloaded by R0b). Use the 2,504 unrelated samples. At n ≈ 5,000 haplotypes, methylated-CpG transitions are far from saturation (θ_CpG ≈ 4×10⁻³ → ~4% of methylated CpGs polymorphic), so recurrence is a small correction, not a blocker. |
 | Human–chimp–macaque alignment | D on the human lineage; polarisation | hg38×panTro6 reciprocal-best axt **on disk** (mcg_evo `reference/ucsc/`); add hg38×rheMac10 rbest axt from UCSC (~1.5 GB) |
 | Germline methylation | stratify the mutation rate | human and chimp sperm WGBS (Molaro 2011, GEO GSE30340: verify); oocyte / early-embryo WGBS (Okae 2014; Guo 2014: verify access) |
 | Somatic methylation | the functional readout | human WGBS atlas by cell type (Loyfer 2023, GEO GSE186458: verify), ENCODE / Roadmap tissue WGBS |
