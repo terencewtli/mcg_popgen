@@ -94,18 +94,27 @@ def main() -> None:
     ap.add_argument('--strong', type=float, default=2.0)
     ap.add_argument('--min-cov', type=int, default=5)
     ap.add_argument('--n-boot', type=int, default=200)
+    ap.add_argument('--with-oocyte', action='store_true',
+                    help='germline bin = sperm bin | MII oocyte regional bin (both sides); outputs get suffix _oo')
     a = ap.parse_args()
     rng = np.random.default_rng(1)
 
     cpg = load_cpg(a.soma_glob, a.motif_dir, a.strong, a.min_cov)
     sw = pd.concat([pd.read_csv(f, sep='\t') for f in sorted(glob.glob(a.sw_glob))], ignore_index=True)
     sw = sw[sw.direction == 'S>W']
+    suffix = ''
+    if a.with_oocyte:
+        cpg['germ'] = cpg.germ + '|' + pd.cut(cpg.oo_reg, GERM_BINS, labels=GERM_LABELS).astype(str)
+        sw['germ'] = sw.germ.astype(str) + '|' + sw.oo.astype(str)
+        sw = sw.groupby(['element', 'direction', 'block', 'germ', 'soma_med', 'soma_min'])[['P', 'Ps', 'D']].sum().reset_index()
+        suffix = '_oo'
+    germs = [g for g in sorted(set(cpg.germ)) if not any(x in g for x in ('discordant', 'nan'))]
     print(f'CpG events: P {cpg.P.sum():,} D {cpg.D.sum():,}; non-CpG S>W: P {sw.P.sum():,} D {sw.D.sum():,}', flush=True)
 
     # germline-matched comparator
     rows = []
     c_bc, s_bc = block_counts(cpg, ['germ', 'element']), block_counts(sw, ['germ', 'element'])
-    for g in GERM_LABELS:
+    for g in germs:
         for el in sorted(set(cpg.element) - {'background'}):
             def stat(c, s, g=g, el=el):
                 c, s = c.groupby(level=[0, 1]).sum() if 'block' in c.index.names else c, \
@@ -122,7 +131,7 @@ def main() -> None:
                              sw_PD=ss.P.sum() / ss.D.sum(), sw_rel=(ss.P.sum() / ss.D.sum()) / (sb.P.sum() / sb.D.sum()),
                              excess=est, excess_lo=lo, excess_hi=hi))
     t = pd.DataFrame(rows)
-    t.to_csv(f'{a.outdir}/R2c_germ_matched.tsv', sep='\t', index=False, float_format='%.4g')
+    t.to_csv(f'{a.outdir}/R2c_germ_matched{suffix}.tsv', sep='\t', index=False, float_format='%.4g')
     print('\n== germline-matched comparator (excess = CpG_rel / SW_rel)\n' + t.to_string(index=False, float_format=lambda v: f'{v:.3g}'), flush=True)
 
     # R2: ratio CpG / SW across somatic bins, at fixed germline bin, non-coding only
@@ -130,7 +139,7 @@ def main() -> None:
               'background': lambda e: e == 'background', 'CGI': lambda e: e == 'CGI'}
     for var in ['soma_med', 'soma_min']:
         rows = []
-        for g in GERM_LABELS:
+        for g in germs:
             for gname, f in groups.items():
                 cs, ss = cpg[(cpg.germ == g) & f(cpg.element)], sw[(sw.germ == g) & f(sw.element)]
                 c_b, s_b = block_counts(cs, [var]), block_counts(ss, [var])
@@ -157,7 +166,7 @@ def main() -> None:
                     est, lo, hi = boot(c_b, s_b, stat, a.n_boot, rng)
                     rows.append(dict(germ=g, group=gname, bin=f'trend {hi_b} / {lo_b}', ratio=est, ratio_lo=lo, ratio_hi=hi))
         t = pd.DataFrame(rows)
-        t.to_csv(f'{a.outdir}/R2c_{var}.tsv', sep='\t', index=False, float_format='%.4g')
+        t.to_csv(f'{a.outdir}/R2c_{var}{suffix}.tsv', sep='\t', index=False, float_format='%.4g')
         print(f'\n== R2 by {var} (ratio = CpG P/D / non-CpG S>W P/D)\n' + t.to_string(index=False, float_format=lambda v: f'{v:.3g}'), flush=True)
 
 

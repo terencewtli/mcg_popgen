@@ -58,6 +58,7 @@ def main() -> None:
     ap.add_argument('--gtf', required=True)
     ap.add_argument('--out', required=True)
     ap.add_argument('--human-sperm', help='R1c human.hg38.bed; adds germ = regional human sperm m bin (+-500 bp)')
+    ap.add_argument('--oocyte', help='R0c MII oocyte bed; adds oo = regional oocyte m bin (+-500 bp)')
     ap.add_argument('--loyfer', help='R2a chrN.tsv.gz; adds soma_med / soma_min = regional somatic m bins (+-500 bp)')
     a = ap.parse_args()
 
@@ -126,6 +127,10 @@ def main() -> None:
         hp, hm = human_sperm_arrays(a.human_sperm, a.chrom, h.tobytes().decode())
         ev['germ'] = pd.cut(regional(hp, hm, ev.i.values), GERM_BINS, labels=GERM_LABELS).astype(str)
         keys.append('germ')
+    if a.oocyte:
+        op, om = human_sperm_arrays(a.oocyte, a.chrom, h.tobytes().decode())
+        ev['oo'] = pd.cut(regional(op, om, ev.i.values), GERM_BINS, labels=GERM_LABELS).astype(str)
+        keys.append('oo')
     if a.loyfer:
         lp, med, mn = loyfer_arrays(a.loyfer, 40)
         ev['soma_med'] = pd.cut(regional(lp, med, ev.i.values), SOMA_BINS, labels=SOMA_LABELS).astype(str)

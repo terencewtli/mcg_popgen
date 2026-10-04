@@ -5,6 +5,7 @@ are therefore taken regionally, identically for P and D sites: the mean over the
   soma_med_reg   mean of Loyfer per-CpG median-across-cell-types m (CpGs covered in >= min_groups groups)
   soma_min_reg   mean of per-CpG minimum across cell types (low = demethylated in some cell type, i.e. active there)
   soma_med_site, soma_min_site   the site's own values (retained CpGs only; NaN at losses)
+  oo_reg         (with --oocyte) mean MII oocyte m of the other CpGs within +-flank bp (cov >= 5; Zhu 2018 via R0c)
 regional() is shared with R1f, so the non-CpG comparator gets the same definitions.
 """
 from __future__ import annotations
@@ -58,6 +59,8 @@ def main() -> None:
     ap.add_argument('--annot', required=True)
     ap.add_argument('--loyfer', required=True, help='R2a chrN.tsv.gz')
     ap.add_argument('--min-groups', type=int, default=40)
+    ap.add_argument('--oocyte', help='R0c MII oocyte bed (hg38; chrom start end m cov); adds oo_reg')
+    ap.add_argument('--fasta', help='hg38 fasta (needed with --oocyte)')
     ap.add_argument('--out', required=True)
     a = ap.parse_args()
 
@@ -69,6 +72,10 @@ def main() -> None:
     site = pd.DataFrame({'med': med, 'mn': mn}, index=lp)
     d['soma_med_site'] = site.med.reindex(p0).values
     d['soma_min_site'] = site.mn.reindex(p0).values
+    if a.oocyte:
+        import pysam
+        op, om = human_sperm_arrays(a.oocyte, a.chrom, pysam.FastaFile(a.fasta).fetch(a.chrom).upper())
+        d['oo_reg'] = regional(op, om, p0)
     print(f'{a.chrom}: {len(d):,} CpGs; regional somatic m available for {np.mean(~np.isnan(d.soma_med_reg)):.3f}; '
           f'corr(site, regional) med {pd.Series(d.soma_med_site).corr(pd.Series(d.soma_med_reg)):.2f}', flush=True)
     d.to_csv(a.out, sep='\t', index=False, compression='gzip', float_format='%.4g')

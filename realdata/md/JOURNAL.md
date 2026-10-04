@@ -192,3 +192,45 @@ both in the same germline bin):
 - Next: download Okae 2014 oocyte / blastocyst WGBS (JGA / DDBJ?) or Guo 2014 (GSE49828); annotate the germline-high
   CGIs with imprinting control regions; translate the bound into per-CpG S with a stabilising-selection simulation
   (laptop).
+
+## 2026-10-03 ~21:00: oocyte methylome (R0c) and R2 stratified by sperm × oocyte
+
+- **R0c** (`scripts/qsub/R0c_oocyte.sh`): Zhu 2018 Nat Genet (GSE81233) single-cell WGBS, hg19 → hg38. All 63 files
+  match the GEO sizes. Cells pooled per group:
+
+| group | cells | CpGs on hg38 | cov ≥ 5 | mean m |
+|---|---|---|---|---|
+| MII oocyte | 36 | 25.99M | 19.16M | 0.57 |
+| GV oocyte | 8 | 18.63M | 5.70M | 0.42 |
+| ICM | 19 | 26.43M | 20.76M | 0.25 |
+
+  - Strand handling checked: 99.2% of lifted positions sit on the C of an hg38 CpG.
+  - MII is used as the oocyte stratum (regional ±500 bp, cov ≥ 5, same definition as sperm, on both the CpG and
+    non-CpG sides).
+- **R2 with sperm | oocyte germline bins** (`tsv/R2/R2c_*_oo.tsv`; R2b `--oocyte`, R1f `--oocyte`,
+  R2c `--with-oocyte`).
+- **Germline-matched comparator:** the sperm-methylated CGI excess does not depend on oocyte state:
+  - high|high 1.91 (1.62–2.20);
+  - high|mid 2.05 (1.60–2.68);
+  - high|low 2.06 (1.52–2.84);
+  - sperm-low CGI: 1.08 (low|low), 1.15 (low|mid), 1.47 (low|high, n = 663 events).
+- **Germline-methylated (sperm-high), the bulk:** flat in every oocyte stratum.
+  - high|high soma_med trend 0.96 (0.87–1.06), elements 0.94 (0.83–1.07); soma_min 0.98 (0.91–1.08).
+  - high|low: 0.90 (0.72–1.17) and 1.05 (0.97–1.14).
+  - The passenger reading is robust to oocyte methylation.
+- **Sperm-low CpGs:**
+  - **low|low** (unmethylated in both gametes): the rise **persists but weakens**.
+    - soma_med trend 1.12 (1.03–1.24), elements 1.17 (1.00–1.39); sperm-only was 1.13 / 1.27.
+    - It is a top-bin effect: the ratio is about 1.0 for soma m 0–0.8 and 1.11–1.15 at 0.8–1.
+    - soma_min is not significant (1.05, 0.94–1.17).
+  - **low|mid:** similar (1.17, 1.05–1.30).
+  - **low|high** (unmethylated in sperm, methylated in oocyte, the pattern of maternal gDMRs / imprinting control
+    regions): elements 0.8–1 vs 0.5–0.8 = 1.86 (1.39–2.58). Few events; candidate imprinted loci.
+- **Reading:**
+  - Oocyte methylation does not explain the sperm-low rise.
+  - The remaining rate route is the **post-implantation epiblast / early PGC window**. The germline is re-methylated
+    to a soma-like state there before PGC erasure, so germline mutations arising in that window see soma-like
+    methylation, and "somatically methylated" partly means "methylated in part of the germline cycle".
+  - Testing that needs human epiblast or early PGC methylomes (e.g. Guo 2015 Cell, Tang 2015 Cell; check access),
+    or a mutation-rate model fitted to de novo mutations (e.g. DNM rates at CpGs by soma m at fixed gamete m).
+  - Until then, the sperm-low rise is not evidence for causal methylation.
