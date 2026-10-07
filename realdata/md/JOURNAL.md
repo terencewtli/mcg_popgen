@@ -234,3 +234,27 @@ both in the same germline bin):
   - Testing that needs human epiblast or early PGC methylomes (e.g. Guo 2015 Cell, Tang 2015 Cell; check access),
     or a mutation-rate model fitted to de novo mutations (e.g. DNM rates at CpGs by soma m at fixed gamete m).
   - Until then, the sperm-low rise is not evidence for causal methylation.
+
+## 2026-10-03 ~23:30: low|high CpGs vs imprinted loci (R2d)
+
+Setup: `scripts/R2d_imprinting.py`, tables `tsv/R2/R2d_*.tsv`.
+- Reference: geneimprint human table (`tsv/R2/geneimprint_human_2026-10-03.tsv`), 'Imprinted' status only: 131 genes,
+  120 in GENCODE.
+- Imprinted locus = gene body ±100 kb.
+- Imprint-like somatic profile = constitutive hemimethylation (soma_min_reg ≥ 0.25 and soma_med_reg 0.3–0.7).
+
+**The low|high excess is not an imprinting signal:**
+- Only 95 of 1,967 low|high element events (4.8%; 44 of 1,111 clusters) lie at imprinted loci, vs 1.6% of all
+  events. That is a ~3× enrichment, but a small share.
+- The somatic profile does not fit imprints. 1,369 / 1,967 of these CpGs are fully methylated in soma (median m
+  0.8–1); only 33 events have the imprint-like hemimethylated profile.
+- The excess sits outside imprinted loci: low|high elements at soma 0.8–1, non-imprinted, P/D 7.14 (1,319 events)
+  vs low|high background 4.36. Imprinted-locus cells are too small to estimate (D ≤ 11).
+- Known gDMRs among the clusters: the RB1 intron-2 CpG island (chr13:48.32 Mb; a known maternal gDMR) and a LIN28B
+  cluster. The other top clusters are CpG islands methylated in oocyte and soma but not sperm (FAT1 region, NEDD4L,
+  EHMT1, NFATC1, TOLLIP, …).
+
+**Reading:** these are mostly oocyte-methylated CGIs that are also fully methylated in somatic tissues. Their excess
+P/D (≈ 1.6× their own background, vs ≈ 1.17× for germline-methylated elements) is probably CGI-level sequence
+constraint: most of them are CGIs, and the element comparator here is not CGI-matched. A CGI-matched comparison
+within low|high is the next check before reading it as methylation-specific.
